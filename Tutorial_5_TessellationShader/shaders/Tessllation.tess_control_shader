@@ -1,0 +1,40 @@
+#version 410 core
+
+in VertexData
+{
+	vec3 vertexPosition_modelspace;
+	vec2 vertexUV;
+	vec3 vertexNormal_modelspace;
+	vec3 vertexBinormal_modelspace;
+	vec3 vertexTangent_modelspace;
+	
+}Vertexin[];
+
+out VertexData
+{
+	vec3 vertexPosition_modelspace;
+	vec2 vertexUV;
+	vec3 vertexNormal_modelspace;
+	vec3 vertexBinormal_modelspace;
+	vec3 vertexTangent_modelspace;
+	
+}VertexOut[];
+
+
+layout(vertices = 3) out;
+uniform int tess; 
+
+void main()
+{
+    VertexOut[gl_InvocationID].vertexPosition_modelspace = Vertexin[gl_InvocationID].vertexPosition_modelspace;
+	VertexOut[gl_InvocationID].vertexUV = Vertexin[gl_InvocationID].vertexUV;    
+	VertexOut[gl_InvocationID].vertexNormal_modelspace = Vertexin[gl_InvocationID].vertexNormal_modelspace;	  
+	VertexOut[gl_InvocationID].vertexBinormal_modelspace = Vertexin[gl_InvocationID].vertexBinormal_modelspace;
+	VertexOut[gl_InvocationID].vertexTangent_modelspace = Vertexin[gl_InvocationID].vertexTangent_modelspace;
+    if (gl_InvocationID == 0) {
+        gl_TessLevelInner[0] = tess;
+        gl_TessLevelOuter[0] = tess;
+        gl_TessLevelOuter[1] = tess;
+        gl_TessLevelOuter[2] = tess;
+    }
+}
