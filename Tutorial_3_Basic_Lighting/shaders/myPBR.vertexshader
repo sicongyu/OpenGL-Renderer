@@ -1,0 +1,31 @@
+#version 410 core
+
+// Input vertex data, different for all executions of this shader.
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec2 aUV;
+layout(location = 2) in vec3 aNormal;
+layout(location = 3) in vec3 aTangent;
+layout(location = 4) in vec3 aBitanget;
+
+out vec2 UV;
+out vec3 WorldPos;
+out vec3 WorldNormal;
+out mat3 TBN;
+
+uniform mat4 MVP;
+uniform mat4 M;
+uniform mat4 V;
+
+void main() {
+
+  gl_Position = MVP * vec4(aPos, 1);
+
+  UV = aUV;
+  WorldPos = (M * vec4(aPos, 1)).xyz;
+  WorldNormal = normalize((M * vec4(aNormal, 0.0)).xyz);
+
+  vec3 WorldTangent = normalize((M * vec4(aTangent, 0.0)).xyz);
+  vec3 WorldBitangent = normalize((M * vec4(aBitanget, 0.0)).xyz);
+
+  TBN = mat3(WorldTangent, WorldBitangent, WorldNormal);
+}

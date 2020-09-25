@@ -83,37 +83,44 @@ int main(void)
 	glBindVertexArray(VertexArrayID);
 
 	// Create and compile our GLSL program from the shaders
-	GLuint programID = LoadShaders("shaders/BasicLighting.vertexshader", 
-								"shaders/BasicLighting.fragmentshader");
+	GLuint programID = LoadShaders("shaders/myPBR.vertexshader", 
+								"shaders/myPBR.fragmentshader");
 
 	// Get a handle for our "MVP" uniform
 	GLuint MatrixID = glGetUniformLocation(programID, "MVP");
 	GLuint ViewMatrixID = glGetUniformLocation(programID, "V");
 	GLuint ModelMatrixID = glGetUniformLocation(programID, "M");
 
-
 	// Get a handle for our "myTextureSampler" uniform
-	GLuint TextureID = glGetUniformLocation(programID, "myTextureSampler");
+	GLuint AlbedoTexID = glGetUniformLocation(programID, "albedoMap");
+	GLuint NormalTexID = glGetUniformLocation(programID, "normalMap");
+	GLuint MetallicTexID = glGetUniformLocation(programID, "metallicMap");
+	GLuint RoughnessTexID = glGetUniformLocation(programID, "roughnessMap");
+	GLuint AOTexID = glGetUniformLocation(programID, "AOMap");
 
-	Mesh monkey("models/suzanne.obj");
-	monkey.LoadTexture(Diffuse,"models/uvmap.DDS");
+	//Mesh monkey("models/suzanne.obj");
+	//monkey.LoadTexture(Diffuse,"models/uvmap.DDS");
 
-	Mesh ninja_head("models/m1911/source/M1911.obj");
-	ninja_head.LoadTexture(Diffuse,"models/m1911/textures/M1911Dis_Material_AO.png");
+	Mesh m1911("models/m1911/source/M1911.obj");
+	m1911.LoadTexture(Diffuse,"models/m1911/textures/M1911Dis_Material_AlbedoTransparency.png");
+	m1911.LoadTexture(Normal_Map, "models/m1911/textures/M1911Dis_Material_NormalOpenGL.png");
+	m1911.LoadTexture(Displace, "models/m1911/textures/M1911Dis_Material_AO.png");
+	m1911.LoadTexture(Roughness, "models/m1911/textures/M1911Dis_Material_Roughness.png");
+	m1911.LoadTexture(Metallic, "models/m1911/textures/M1911Dis_Material_MetallicSmoothness.png");
 
 	// Get a handle for our "LightPosition" uniform
 	glUseProgram(programID);
-	GLuint LightID = glGetUniformLocation(programID, "LightPosition_worldspace");
+	GLuint LightID = glGetUniformLocation(programID, "LightPos");
 
-	auto f = [&ninja_head, &monkey](Mesh * & cur_mesh)
-	{
-		if (glfwGetKey(window,GLFW_KEY_N) == GLFW_PRESS)
-			cur_mesh = &ninja_head;
-		else if (glfwGetKey(window,GLFW_KEY_C) == GLFW_PRESS)
-		{
-			cur_mesh = &monkey;
-		}
-	};
+	//auto f = [&ninja_head, &monkey](Mesh * & cur_mesh)
+	//{
+	//	if (glfwGetKey(window,GLFW_KEY_N) == GLFW_PRESS)
+	//		cur_mesh = &ninja_head;
+	//	else if (glfwGetKey(window,GLFW_KEY_C) == GLFW_PRESS)
+	//	{
+	//		cur_mesh = &monkey;
+	//	}
+	//};
 	
 	float angle = 0.0;
 	float lastTime = 0.0f;
@@ -140,9 +147,9 @@ int main(void)
 		lastTime = curTime;
 	};
 
-	Mesh * cur_mesh = &ninja_head;
+	Mesh * cur_mesh = &m1911;
 	do{
-		f(cur_mesh);
+		//f(cur_mesh);
 		// Clear the screen
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -170,11 +177,26 @@ int main(void)
 		glm::vec3 lightPos = glm::vec3(4, 4, 4);
 		glUniform3f(LightID, lightPos.x, lightPos.y, lightPos.z);
 
-		// Bind our texture in Texture Unit 0
+		// Bind our textures in Texture Unit 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, cur_mesh->diffuse_texture_id);
-		// Set our "myTextureSampler" sampler to user Texture Unit 0
-		glUniform1i(TextureID, 0);
+		glUniform1i(AlbedoTexID, 0);
+
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, cur_mesh->normal_texture_id);
+		glUniform1i(NormalTexID, 1);
+
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, cur_mesh->displace_texture_id);
+		glUniform1i(AOTexID, 2);
+
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, cur_mesh->roughness_texture_id);
+		glUniform1i(RoughnessTexID, 3);
+
+		glActiveTexture(GL_TEXTURE4);
+		glBindTexture(GL_TEXTURE_2D, cur_mesh->metallic_texture_id);
+		glUniform1i(MetallicTexID, 4);
 
 		// 1rst attribute buffer : vertices
 		glEnableVertexAttribArray(0);
