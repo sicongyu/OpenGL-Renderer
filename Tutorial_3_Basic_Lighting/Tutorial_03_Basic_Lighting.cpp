@@ -68,7 +68,7 @@ int main(void)
 	glfwSetCursorPos(window, 1024 / 2, 768 / 2);
 
 	// Dark blue background
-	glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
+	glClearColor(0.227f, 0.227f, 0.227f, 0.0f);
 
 	// Enable depth test
 	glEnable(GL_DEPTH_TEST);
@@ -101,7 +101,7 @@ int main(void)
 	//Mesh monkey("models/suzanne.obj");
 	//monkey.LoadTexture(Diffuse,"models/uvmap.DDS");
 
-	Mesh m1911("models/m1911/source/M1911.obj");
+	Mesh m1911("models/m1911/source/M1911.obj", true);
 	m1911.LoadTexture(Diffuse,"models/m1911/textures/M1911Dis_Material_AlbedoTransparency.png");
 	m1911.LoadTexture(Normal_Map, "models/m1911/textures/M1911Dis_Material_NormalOpenGL.png");
 	m1911.LoadTexture(Displace, "models/m1911/textures/M1911Dis_Material_AO.png");
@@ -111,6 +111,7 @@ int main(void)
 	// Get a handle for our "LightPosition" uniform
 	glUseProgram(programID);
 	GLuint LightID = glGetUniformLocation(programID, "LightPos");
+	GLuint CameraID = glGetUniformLocation(programID, "CameraPos");
 
 	//auto f = [&ninja_head, &monkey](Mesh * & cur_mesh)
 	//{
@@ -132,10 +133,10 @@ int main(void)
 			lastTime = curTime;
 		auto delta = curTime - lastTime;
 		if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-			angle += 20.0f * delta;
+			angle += 40.0f * delta;
 		else if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
 		{
-			angle -= 20.0f * delta;
+			angle -= 40.0f * delta;
 		}
 		//if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
 		//	distance += 20.0f * delta;
@@ -152,6 +153,7 @@ int main(void)
 		//f(cur_mesh);
 		// Clear the screen
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		//glPatchParameteri(GL_PATCH_VERTICES, 3);
 
 		// Use our shader
 		glUseProgram(programID);
@@ -174,8 +176,10 @@ int main(void)
 		glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &ModelMatrix[0][0]);
 		glUniformMatrix4fv(ViewMatrixID, 1, GL_FALSE, &ViewMatrix[0][0]);
 
-		glm::vec3 lightPos = glm::vec3(4, 4, 4);
+		glm::vec3 lightPos = glm::vec3(0, 4, 4);
 		glUniform3f(LightID, lightPos.x, lightPos.y, lightPos.z);
+		glm::vec3 cameraPos = getPosition();
+		glUniform3f(CameraID, cameraPos.x, cameraPos.y, cameraPos.z);
 
 		// Bind our textures in Texture Unit 
 		glActiveTexture(GL_TEXTURE0);
@@ -234,12 +238,39 @@ int main(void)
 			(void*)0                          // array buffer offset
 			);
 
+		glEnableVertexAttribArray(3);
+		glBindBuffer(GL_ARRAY_BUFFER, cur_mesh->tangent_id);
+		glVertexAttribPointer(
+			3,                                // attribute
+			3,                                // size
+			GL_FLOAT,                         // type
+			GL_FALSE,                         // normalized?
+			0,                                // stride
+			(void*)0                          // array buffer offset
+		);
+
+		glEnableVertexAttribArray(4);
+		glBindBuffer(GL_ARRAY_BUFFER, cur_mesh->binormal_id);
+		glVertexAttribPointer(
+			4,                                // attribute
+			3,                                // size
+			GL_FLOAT,                         // type
+			GL_FALSE,                         // normalized?
+			0,                                // stride
+			(void*)0                          // array buffer offset
+		);
+
 		// Draw the triangles !
-		glDrawArrays(GL_TRIANGLES, 0, cur_mesh->vertex_size);
+		glDrawArrays(GL_TRIANGLES, 0, cur_mesh->vertex_size);;
+
+		//glDrawElements(GL_PATCHES, cur_mesh->face_size * 3, GL_UNSIGNED_SHORT, (void *)0);
 
 		glDisableVertexAttribArray(0);
 		glDisableVertexAttribArray(1);
 		glDisableVertexAttribArray(2);
+		glDisableVertexAttribArray(3);
+		glDisableVertexAttribArray(4);
+
 		//printText2D("Arrow Key move camera ,LSHIFT Speed", 10, 10, 20);
 		//printText2D("0 NinjaHead", 10, 50, 20);
 		//printText2D("1 Cube", 10, 80, 20);

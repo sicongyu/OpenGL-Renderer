@@ -26,6 +26,7 @@ void main() {
 
   vec3 WorldTangent = normalize((M * vec4(aTangent, 0.0)).xyz);
   vec3 WorldBitangent = normalize((M * vec4(aBitanget, 0.0)).xyz);
+  // vec3 WorldBitangent = normalize(cross(WorldNormal, WorldTangent));
 
   TBN = mat3(WorldTangent, WorldBitangent, WorldNormal);
 }

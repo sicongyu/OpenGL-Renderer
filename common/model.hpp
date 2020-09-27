@@ -72,6 +72,8 @@ struct Mesh
 		delete_texture(diffuse_texture_id);
 		delete_texture(displace_texture_id);
 		delete_texture(normal_texture_id);
+		delete_texture(roughness_texture_id);
+		delete_texture(metallic_texture_id);
 
 
 	}
