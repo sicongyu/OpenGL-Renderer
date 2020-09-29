@@ -23,6 +23,10 @@ using namespace glm;
 
 #include <common/model.hpp>
 
+#include <common/stb_image.h>
+
+#define PREVIEW_CUBE 0
+
 GLFWwindow* window;
 
 void error_callback(int error, const char* description)
@@ -85,6 +89,7 @@ int main(void)
 	// Create and compile our GLSL program from the shaders
 	GLuint programID = LoadShaders("shaders/myPBR.vertexshader", 
 								"shaders/myPBR.fragmentshader");
+	GLuint cubeProgramID = LoadShaders("shaders/Cube.vertexshader", "shaders/Cube.fragmentshader");
 
 	// Get a handle for our "MVP" uniform
 	GLuint MatrixID = glGetUniformLocation(programID, "MVP");
@@ -122,6 +127,78 @@ int main(void)
 	//		cur_mesh = &monkey;
 	//	}
 	//};
+#if PREVIEW_CUBE
+	// Load HDR Environment Mapping Image for IBL
+	stbi_set_flip_vertically_on_load(true);
+	int width, height, nrComponents;
+	float *data = stbi_loadf("models/Old_Industrial_Hall/fin4_Env.hdr", &width, &height, &nrComponents, 0);
+	unsigned int hdrTexture;
+	if (data)
+	{
+		glGenTextures(1, &hdrTexture);
+		glBindTexture(GL_TEXTURE_2D, hdrTexture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		stbi_image_free(data);
+	}
+	else
+	{
+		printf("Failed to load HDR image.");
+		//std::cout << "Failed to load HDR image." << std::endl;
+	}
+
+	GLuint EnvMapID = glGetUniformLocation(cubeProgramID, "equirectangularMap");
+	GLuint CubeViewMatrixID = glGetUniformLocation(cubeProgramID, "V");
+	GLuint CubeProjectionMatrixID = glGetUniformLocation(cubeProgramID, "P");
+
+	static const GLfloat g_vertex_buffer_data[] = {
+		-1.0f, -1.0f, -1.0f,
+		-1.0f, -1.0f, 1.0f,
+		-1.0f, 1.0f, 1.0f,
+		1.0f, 1.0f, -1.0f,
+		-1.0f, -1.0f, -1.0f,
+		-1.0f, 1.0f, -1.0f,
+		1.0f, -1.0f, 1.0f,
+		-1.0f, -1.0f, -1.0f,
+		1.0f, -1.0f, -1.0f,
+		1.0f, 1.0f, -1.0f,
+		1.0f, -1.0f, -1.0f,
+		-1.0f, -1.0f, -1.0f,
+		-1.0f, -1.0f, -1.0f,
+		-1.0f, 1.0f, 1.0f,
+		-1.0f, 1.0f, -1.0f,
+		1.0f, -1.0f, 1.0f,
+		-1.0f, -1.0f, 1.0f,
+		-1.0f, -1.0f, -1.0f,
+		-1.0f, 1.0f, 1.0f,
+		-1.0f, -1.0f, 1.0f,
+		1.0f, -1.0f, 1.0f,
+		1.0f, 1.0f, 1.0f,
+		1.0f, -1.0f, -1.0f,
+		1.0f, 1.0f, -1.0f,
+		1.0f, -1.0f, -1.0f,
+		1.0f, 1.0f, 1.0f,
+		1.0f, -1.0f, 1.0f,
+		1.0f, 1.0f, 1.0f,
+		1.0f, 1.0f, -1.0f,
+		-1.0f, 1.0f, -1.0f,
+		1.0f, 1.0f, 1.0f,
+		-1.0f, 1.0f, -1.0f,
+		-1.0f, 1.0f, 1.0f,
+		1.0f, 1.0f, 1.0f,
+		-1.0f, 1.0f, 1.0f,
+		1.0f, -1.0f, 1.0f
+	};
+	Mesh cube_mesh;
+	cube_mesh.setAtrribute(Pos, (void *)g_vertex_buffer_data, sizeof(g_vertex_buffer_data));
+	cube_mesh.vertex_size = sizeof(g_vertex_buffer_data) / sizeof(float) / 3;
+	cube_mesh.face_size = cube_mesh.vertex_size / 3;
+#endif
 	
 	float angle = 0.0;
 	float lastTime = 0.0f;
@@ -261,15 +338,42 @@ int main(void)
 		);
 
 		// Draw the triangles !
-		glDrawArrays(GL_TRIANGLES, 0, cur_mesh->vertex_size);;
 
-		//glDrawElements(GL_PATCHES, cur_mesh->face_size * 3, GL_UNSIGNED_SHORT, (void *)0);
+		//glDrawArrays(GL_TRIANGLES, 0, cur_mesh->vertex_size);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cur_mesh->index_id);
+		glDrawElements(GL_TRIANGLES, cur_mesh->face_size * 3, GL_UNSIGNED_SHORT, (void *)0);
 
 		glDisableVertexAttribArray(0);
 		glDisableVertexAttribArray(1);
 		glDisableVertexAttribArray(2);
 		glDisableVertexAttribArray(3);
 		glDisableVertexAttribArray(4);
+
+#if PREVIEW_CUBE
+		//  --- sky box pass ---
+		glUseProgram(cubeProgramID);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, hdrTexture);
+		glUniform1i(EnvMapID, 0);
+
+		glUniformMatrix4fv(CubeProjectionMatrixID, 1, GL_FALSE, &ProjectionMatrix[0][0]);
+		glUniformMatrix4fv(CubeViewMatrixID, 1, GL_FALSE, &ViewMatrix[0][0]);
+
+		glEnableVertexAttribArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, cube_mesh.pos_id);
+		glVertexAttribPointer(
+			0,                  // attribute
+			3,                  // size
+			GL_FLOAT,           // type
+			GL_FALSE,           // normalized?
+			0,                  // stride
+			(void*)0            // array buffer offset
+		);
+		glDrawArrays(GL_TRIANGLES, 0, cube_mesh.vertex_size);
+		glDisableVertexAttribArray(0);
+#endif
 
 		//printText2D("Arrow Key move camera ,LSHIFT Speed", 10, 10, 20);
 		//printText2D("0 NinjaHead", 10, 50, 20);

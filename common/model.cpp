@@ -26,20 +26,20 @@ Mesh::Mesh(const std::string & file_name, bool tangent /*= false*/) :Mesh()
 			vertices, uvs, normals, // input
 			tangents, bitangents    // output
 			);
-		//std::vector<glm::vec3> indexed_vertices;
-		//std::vector<glm::vec2> indexed_uvs;
-		//std::vector<glm::vec3> indexed_normals;
-		//std::vector<glm::vec3> indexed_tangents;
-		//std::vector<glm::vec3> indexed_bitangents;
-		//indexVBO_TBN(
-		//	vertices, uvs, normals, tangents, bitangents,
-		//	indices, indexed_vertices, indexed_uvs, indexed_normals, indexed_tangents, indexed_bitangents
-		//	);
-		//vertices.swap(indexed_vertices);
-		//uvs.swap(indexed_uvs);
-		//normals.swap(indexed_normals);
-		//tangents.swap(indexed_tangents);
-		//bitangents.swap(indexed_bitangents);
+		std::vector<glm::vec3> indexed_vertices;
+		std::vector<glm::vec2> indexed_uvs;
+		std::vector<glm::vec3> indexed_normals;
+		std::vector<glm::vec3> indexed_tangents;
+		std::vector<glm::vec3> indexed_bitangents;
+		indexVBO_TBN(
+			vertices, uvs, normals, tangents, bitangents,
+			indices, indexed_vertices, indexed_uvs, indexed_normals, indexed_tangents, indexed_bitangents
+			);
+		vertices.swap(indexed_vertices);
+		uvs.swap(indexed_uvs);
+		normals.swap(indexed_normals);
+		tangents.swap(indexed_tangents);
+		bitangents.swap(indexed_bitangents);
 	}
 
 	vertex_size = vertices.size();

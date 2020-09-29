@@ -238,15 +238,20 @@ int main(void)
 	ninja_head.LoadTexture(Normal_Map, "models/ninja_head_NM.bmp");
 	ninja_head.LoadTexture(Diffuse, "models/ninja_head_AO.bmp");
 
+	Mesh m1911("models/m1911/source/M1911.obj", true);
+	m1911.LoadTexture(Diffuse, "models/m1911/textures/M1911Dis_Material_AlbedoTransparency.png");
+	m1911.LoadTexture(Normal_Map, "models/m1911/textures/M1911Dis_Material_NormalOpenGL.png");
+	m1911.LoadTexture(Displace, "models/m1911/textures/M1911Dis_Material_AO.png");
+
 	// Get a handle for our "LightPosition" uniform
 	glUseProgram(programID);
 	GLuint LightID = glGetUniformLocation(programID, "LightPosition_worldspace");
 	//initText2D("Holstein.tga");
 	float dis = 0.17585;
 	float scale = 0.2;
-	Mesh * cur_mesh = &ninja_head;
+	Mesh * cur_mesh = &m1911;
 
-	Mesh * meshes[2] = { &ninja_head, &grid };
+	Mesh * meshes[2] = { &m1911, &grid };
 	float  scales[2] = { 0.2f, 5.0f };
 	float  dises[2] = { 0.17585f, 0.0f };
 
@@ -322,6 +327,9 @@ int main(void)
 		glm::mat4 ProjectionMatrix = getProjectionMatrix();
 		glm::mat4 ViewMatrix  = getViewMatrix();
 		glm::mat4 ModelMatrix = glm::mat4(1.0);
+		ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.001, 0.001, 0.001));
+		//ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0, 0, distance));
+		ModelMatrix = glm::rotate(ModelMatrix, -90.0f, glm::vec3(1, 0, 0));
 		glm::mat4 MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
 		
 
