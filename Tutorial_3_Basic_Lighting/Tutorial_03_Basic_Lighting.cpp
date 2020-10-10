@@ -28,12 +28,104 @@ using namespace glm;
 #define PREVIEW_CUBE 0
 #define USE_IBL 1
 
+#define CUBEMAP_WIDTH 1024
+
 GLFWwindow* window;
 
 void error_callback(int error, const char* description)
 {
     puts(description);
 }
+
+
+void RenderCube(Mesh& cube_mesh) {
+
+	glEnableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, cube_mesh.pos_id);
+	glVertexAttribPointer(
+		0,                  // attribute
+		3,                  // size
+		GL_FLOAT,           // type
+		GL_FALSE,           // normalized?
+		0,                  // stride
+		(void*)0            // array buffer offset
+	);
+	glDrawArrays(GL_TRIANGLES, 0, cube_mesh.vertex_size);
+	glDisableVertexAttribArray(0);
+}
+
+unsigned int cubeVAO = 0;
+unsigned int cubeVBO = 0;
+void RenderCube1() {
+	// initialize (if necessary)
+	if (cubeVAO == 0)
+	{
+		float vertices[] = {
+			// back face
+			-1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
+			 1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
+			 1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f, // bottom-right         
+			 1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
+			-1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
+			-1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 1.0f, // top-left
+			// front face
+			-1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
+			 1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 0.0f, // bottom-right
+			 1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
+			 1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
+			-1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 1.0f, // top-left
+			-1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
+			// left face
+			-1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
+			-1.0f,  1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-left
+			-1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
+			-1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
+			-1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-right
+			-1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
+			// right face
+			 1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
+			 1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
+			 1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-right         
+			 1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
+			 1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
+			 1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-left     
+			// bottom face
+			-1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
+			 1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 1.0f, // top-left
+			 1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
+			 1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
+			-1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 0.0f, // bottom-right
+			-1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
+			// top face
+			-1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
+			 1.0f,  1.0f , 1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
+			 1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f, // top-right     
+			 1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
+			-1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
+			-1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f  // bottom-left        
+		};
+		glGenVertexArrays(1, &cubeVAO);
+		glGenBuffers(1, &cubeVBO);
+		// fill buffer
+		glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+		// link vertex attributes
+		glBindVertexArray(cubeVAO);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+	}
+	// render Cube
+	glBindVertexArray(cubeVAO);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glBindVertexArray(0);
+}
+
 
 int main(void)
 {
@@ -78,10 +170,11 @@ int main(void)
 	// Enable depth test
 	glEnable(GL_DEPTH_TEST);
 	// Accept fragment if it closer to the camera than the former one
-	glDepthFunc(GL_LESS);
+	//glDepthFunc(GL_LESS);
+	glDepthFunc(GL_LEQUAL); // set depth function to less than AND equal for skybox depth trick.
 
 	// Cull triangles which normal is not towards the camera
-	glEnable(GL_CULL_FACE);
+	//glEnable(GL_CULL_FACE);
 
 	GLuint VertexArrayID;
 	glGenVertexArrays(1, &VertexArrayID);
@@ -90,7 +183,6 @@ int main(void)
 	// Create and compile our GLSL program from the shaders
 	GLuint programID = LoadShaders("shaders/myPBR.vertexshader", 
 								"shaders/myPBR.fragmentshader");
-	GLuint cubeProgramID = LoadShaders("shaders/Cube.vertexshader", "shaders/Cube.fragmentshader");
 
 	// Get a handle for our "MVP" uniform
 	GLuint MatrixID = glGetUniformLocation(programID, "MVP");
@@ -119,16 +211,18 @@ int main(void)
 	GLuint LightID = glGetUniformLocation(programID, "LightPos");
 	GLuint CameraID = glGetUniformLocation(programID, "CameraPos");
 
-	//auto f = [&ninja_head, &monkey](Mesh * & cur_mesh)
-	//{
-	//	if (glfwGetKey(window,GLFW_KEY_N) == GLFW_PRESS)
-	//		cur_mesh = &ninja_head;
-	//	else if (glfwGetKey(window,GLFW_KEY_C) == GLFW_PRESS)
-	//	{
-	//		cur_mesh = &monkey;
-	//	}
-	//};
-#if PREVIEW_CUBE
+#if PREVIEW_CUBE || USE_IBL
+	GLuint equirectangularToCubeProgramID = LoadShaders("shaders/Cube.vertexshader", "shaders/Cube.fragmentshader");
+	GLuint cubemapProgramID = LoadShaders("shaders/Cubemap.vertexshader", "shaders/Cubemap.fragmentshader");
+
+	GLuint E2CViewMatrixID = glGetUniformLocation(equirectangularToCubeProgramID, "V");
+	GLuint E2CProjectionMatrixID = glGetUniformLocation(equirectangularToCubeProgramID, "P");
+	GLuint E2CEnvMapID = glGetUniformLocation(equirectangularToCubeProgramID, "equirectangularMap");
+
+	GLuint CubemapViewMatrixID = glGetUniformLocation(cubemapProgramID, "V");
+	GLuint CubemapProjectionMatrixID = glGetUniformLocation(cubemapProgramID, "P");
+	GLuint CubemapEnvMapID = glGetUniformLocation(cubemapProgramID, "environmentMap");
+
 	// Load HDR Environment Mapping Image for IBL
 	stbi_set_flip_vertically_on_load(true);
 	int width, height, nrComponents;
@@ -153,9 +247,6 @@ int main(void)
 		//std::cout << "Failed to load HDR image." << std::endl;
 	}
 
-	GLuint EnvMapID = glGetUniformLocation(cubeProgramID, "equirectangularMap");
-	GLuint CubeViewMatrixID = glGetUniformLocation(cubeProgramID, "V");
-	GLuint CubeProjectionMatrixID = glGetUniformLocation(cubeProgramID, "P");
 
 	static const GLfloat g_vertex_buffer_data[] = {
 		-1.0f, -1.0f, -1.0f,
@@ -208,14 +299,14 @@ int main(void)
 
 	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
 	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, CUBEMAP_WIDTH, CUBEMAP_WIDTH);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
 
 	unsigned int envCubemap;
 	glGenTextures(1, &envCubemap);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
 	for (unsigned int i = 0; i < 6; i++) {
-		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, CUBEMAP_WIDTH, CUBEMAP_WIDTH, 0, GL_RGB, GL_FLOAT, nullptr);
 	}
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -223,17 +314,52 @@ int main(void)
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+	// Projection equirectangular map to six faces of cube
 	glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
-	glm::mat4 captureViews[] = 
+	glm::mat4 captureViews[] =
 	{
 		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
 		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
 		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
 		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
-		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
-		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
-	}
+		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+		glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f))
+	};
 
+	// convert HDR equirectangular environment map to cubemap equivalent
+	glUseProgram(equirectangularToCubeProgramID);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, hdrTexture);
+	glUniform1i(E2CEnvMapID, 0);
+
+	glUniformMatrix4fv(E2CProjectionMatrixID, 1, GL_FALSE, &captureProjection[0][0]);
+
+	glViewport(0, 0, CUBEMAP_WIDTH, CUBEMAP_WIDTH);
+	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	for (unsigned int i = 0; i < 6; i++) {
+		glUniformMatrix4fv(E2CViewMatrixID, 1, GL_FALSE, &captureViews[i][0][0]);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		RenderCube(cube_mesh);
+		//RenderCube1();
+	}
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		printf("ERROR::FRAMEBUFFER:: Framebuffer is not complete!");
+
+	//glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// configure the viewport to the original framebuffer's screen dimensions
+	int scrWidth, scrHeight;
+	glfwGetFramebufferSize(window, &scrWidth, &scrHeight);
+	glViewport(0, 0, scrWidth, scrHeight);
+
+	// Initialize Cubemap Shader
+	//glUseProgram(cubemapProgramID);
+	//glUseProgram(cubemapProgramID);
+	//glm::mat4 CubemapProjectionMatrix = getProjectionMatrix();
+	//glUniformMatrix4fv(CubemapProjectionMatrixID, 1, GL_FALSE, &CubemapProjectionMatrix[0][0]);
 #endif
 	
 	float angle = 0.0;
@@ -388,27 +514,52 @@ int main(void)
 
 #if PREVIEW_CUBE
 		//  --- sky box pass ---
-		glUseProgram(cubeProgramID);
+		glUseProgram(equirectangularToCubeProgramID);
 
-		glActiveTexture(GL_TEXTURE0);
+		glActiveTexture(GL_TEXTURE5);
 		glBindTexture(GL_TEXTURE_2D, hdrTexture);
-		glUniform1i(EnvMapID, 0);
+		glUniform1i(E2CEnvMapID, 5);
 
-		glUniformMatrix4fv(CubeProjectionMatrixID, 1, GL_FALSE, &ProjectionMatrix[0][0]);
-		glUniformMatrix4fv(CubeViewMatrixID, 1, GL_FALSE, &ViewMatrix[0][0]);
+		glUniformMatrix4fv(E2CProjectionMatrixID, 1, GL_FALSE, &ProjectionMatrix[0][0]);
+		glUniformMatrix4fv(E2CViewMatrixID, 1, GL_FALSE, &ViewMatrix[0][0]);
 
-		glEnableVertexAttribArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, cube_mesh.pos_id);
-		glVertexAttribPointer(
-			0,                  // attribute
-			3,                  // size
-			GL_FLOAT,           // type
-			GL_FALSE,           // normalized?
-			0,                  // stride
-			(void*)0            // array buffer offset
-		);
-		glDrawArrays(GL_TRIANGLES, 0, cube_mesh.vertex_size);
-		glDisableVertexAttribArray(0);
+		RenderCube(cube_mesh);
+#endif
+
+#if USE_IBL
+
+		// convert HDR equirectangular environment map to cubemap equivalent
+		glUseProgram(equirectangularToCubeProgramID);
+
+		glActiveTexture(GL_TEXTURE5);
+		glBindTexture(GL_TEXTURE_2D, hdrTexture);
+		glUniform1i(E2CEnvMapID, 5);
+
+		//glUniformMatrix4fv(E2CProjectionMatrixID, 1, GL_FALSE, &captureProjection[0][0]);
+		glUniformMatrix4fv(E2CProjectionMatrixID, 1, GL_FALSE, &ProjectionMatrix[0][0]);
+
+		glViewport(0, 0, CUBEMAP_WIDTH, CUBEMAP_WIDTH);
+		glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+		for (unsigned int i = 0; i < 6; i++) {
+			glUniformMatrix4fv(E2CViewMatrixID, 1, GL_FALSE, &captureViews[i][0][0]);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			RenderCube(cube_mesh);
+		}
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		// configure the viewport to the original framebuffer's screen dimensions
+		int scrWidth, scrHeight;
+		glfwGetFramebufferSize(window, &scrWidth, &scrHeight);
+		glViewport(0, 0, scrWidth, scrHeight);
+
+		glUseProgram(cubemapProgramID);
+		glUniformMatrix4fv(CubemapProjectionMatrixID, 1, GL_FALSE, &ProjectionMatrix[0][0]);
+		glUniformMatrix4fv(CubemapViewMatrixID, 1, GL_FALSE, &ViewMatrix[0][0]);
+		glActiveTexture(GL_TEXTURE6);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+		glUniform1i(CubemapEnvMapID, 6);
+		RenderCube(cube_mesh);
 #endif
 
 		//printText2D("Arrow Key move camera ,LSHIFT Speed", 10, 10, 20);
@@ -428,10 +579,14 @@ int main(void)
 
 	glDeleteProgram(programID);
 	glDeleteVertexArrays(1, &VertexArrayID);
+	glDeleteProgram(equirectangularToCubeProgramID);
+	glDeleteProgram(cubemapProgramID);
+
 
 	// Close OpenGL window and terminate GLFW
 	glfwTerminate();
 
 	return 0;
 }
+
 
