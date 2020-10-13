@@ -10,7 +10,7 @@ layout(location = 4) in vec3 aBitanget;
 out vec2 UV;
 out vec3 WorldPos;
 out vec3 WorldNormal;
-out vec3 WorldTangent;
+// out vec3 WorldTangent;
 out mat3 TBN;
 
 uniform mat4 MVP;
@@ -25,7 +25,7 @@ void main() {
   WorldPos = (M * vec4(aPos, 1)).xyz;
   WorldNormal = normalize((M * vec4(aNormal, 0.0)).xyz);
 
-  WorldTangent = normalize((M * vec4(aTangent, 0.0)).xyz);
+  vec3 WorldTangent = normalize((M * vec4(aTangent, 0.0)).xyz);
   vec3 WorldBitangent = normalize((M * vec4(aBitanget, 0.0)).xyz);
   // vec3 WorldBitangent = normalize(cross(WorldNormal, WorldTangent));
 

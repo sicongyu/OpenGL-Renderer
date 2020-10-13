@@ -275,28 +275,28 @@ int main(void)
 	//monkey.LoadTexture(Diffuse,"models/uvmap.DDS");
 
 
-	Mesh * cur_mesh;
+	Mesh* cur_mesh;
 	Model cur_model = M1911;
 	switch (cur_model)
 	{
 	case M1911: {
-		Mesh m1911("models/m1911/source/M1911.obj", true);
-		m1911.LoadTexture(Diffuse, "models/m1911/textures/M1911Dis_Material_AlbedoTransparency.png");
-		m1911.LoadTexture(Normal_Map, "models/m1911/textures/M1911Dis_Material_NormalOpenGL.png");
-		m1911.LoadTexture(Displace, "models/m1911/textures/M1911Dis_Material_AO.png");
-		m1911.LoadTexture(Roughness, "models/m1911/textures/M1911Dis_Material_Roughness.png");
-		m1911.LoadTexture(Metallic, "models/m1911/textures/M1911Dis_Material_MetallicSmoothness.png");
-		cur_mesh = &m1911;
+		Mesh* m1911 = new Mesh("models/m1911/source/M1911.obj", true);
+		m1911->LoadTexture(Diffuse, "models/m1911/textures/M1911Dis_Material_AlbedoTransparency.png");
+		m1911->LoadTexture(Normal_Map, "models/m1911/textures/M1911Dis_Material_NormalOpenGL.png");
+		m1911->LoadTexture(Displace, "models/m1911/textures/M1911Dis_Material_AO.png");
+		m1911->LoadTexture(Roughness, "models/m1911/textures/M1911Dis_Material_Roughness.png");
+		m1911->LoadTexture(Metallic, "models/m1911/textures/M1911Dis_Material_MetallicSmoothness.png");
+		cur_mesh = m1911;
 		break;
 		}
 	case Cerberus: {
-		Mesh cerberus("models/Cerberus_by_Andrew_Maximov/Cerberus_LP.obj", true);
-		cerberus.LoadTexture(Diffuse, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_A.tga");
-		cerberus.LoadTexture(Normal_Map, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_N.tga");
-		cerberus.LoadTexture(Displace, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_N.tga");
-		cerberus.LoadTexture(Roughness, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_R.tga");
-		cerberus.LoadTexture(Metallic, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_M.tga");
-		cur_mesh = &cerberus;
+		Mesh* cerberus = new Mesh("models/Cerberus_by_Andrew_Maximov/Cerberus_LP.obj", true);
+		cerberus->LoadTexture(Diffuse, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_A.tga");
+		cerberus->LoadTexture(Normal_Map, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_N.tga");
+		cerberus->LoadTexture(Displace, "models/Cerberus_by_Andrew_Maximov/Textures/RAW/Cerberus_AO.tga");
+		cerberus->LoadTexture(Roughness, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_R.tga");
+		cerberus->LoadTexture(Metallic, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_M.tga");
+		cur_mesh = cerberus;
 		break;
 		}
 	default:
@@ -430,6 +430,7 @@ int main(void)
 
 		lastTime = curTime;
 	};
+
 
 	do{
 		//f(cur_mesh);
@@ -617,7 +618,9 @@ int main(void)
 	glDeleteVertexArrays(1, &VertexArrayID);
 	glDeleteProgram(equirectangularToCubeProgramID);
 	glDeleteProgram(cubemapProgramID);
+	glDeleteProgram(prefilterProgramID);
 
+	delete cur_mesh;
 
 	// Close OpenGL window and terminate GLFW
 	glfwTerminate();
