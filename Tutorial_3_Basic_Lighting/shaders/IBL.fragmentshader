@@ -5,6 +5,7 @@ out vec4 FragColor;
 in vec2 UV;
 in vec3 WorldPos;
 in vec3 WorldNormal;
+in vec3 WorldTangent;
 in mat3 TBN;
 
 uniform vec3 CameraPos;
@@ -15,6 +16,8 @@ uniform sampler2D AOMap;
 uniform sampler2D roughnessMap;
 uniform sampler2D metallicMap;
 uniform samplerCube irradianceMap;
+uniform samplerCube prefilterMap;
+uniform sampler2D brdfLUT;
 uniform vec3 LightPos;
 
 const float PI = 3.14159265359;
@@ -22,6 +25,10 @@ const vec3 lightColor = vec3(300.0);
 
 vec3 readNormalMap() {
     vec3 normal = (texture(normalMap, UV) * 2.0 - 1.0).xyz;
+    // vec3 NormalizedWorldNormal = normalize(WorldNormal);
+    // vec3 NormalizedWorldTangent = normalize(WorldTangent);
+    // vec3 WorldBitangent = normalize(cross(NormalizedWorldNormal, NormalizedWorldTangent));
+    // mat3 TBN = mat3(NormalizedWorldTangent, WorldBitangent, NormalizedWorldNormal);
     return normalize(TBN * normal);
     // return normal;
 }
@@ -76,37 +83,60 @@ void main() {
 
     vec3 L = normalize(LightPos - WorldPos);
     vec3 H = normalize(V + L);
+    vec3 R = reflect(-V, N);
 
-    vec3 Lo = vec3(0.0);
-    // Light attenuation
-    vec3 LightColor = vec3(1.0);
-    float distance = length(LightPos - WorldPos);
-    // float attenuation = 1.0 / (distance * distance);
-    float attenuation = 1.0;
-    vec3 radiance = LightColor * attenuation;
-
-    // DFG
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedo, metallic);
-    vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
 
-    float D = DistributionGGX(N, H, roughness);
-    float G = GeometrySmith(N, V, L, roughness);
+    vec3 Lo = vec3(0.0);
 
-    // Cook-Torrance Specular BRDF term
-    vec3 numerator = D * F * G;
-    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0);
-    vec3 specular = numerator / max(denominator, 0.001);
+    for (int i = 0; i < 1; i++) {
+        // Light attenuation
+        vec3 LightColor = vec3(1.0);
+        float distance = length(LightPos - WorldPos);
+        // float attenuation = 1.0 / (distance * distance);
+        float attenuation = 1.0;
+        vec3 radiance = LightColor * attenuation;
 
-    // Cook-Torrance Diffuse Term
-    // vec3 kS = F; // kS is equal to F
-    vec3 kS = fresnelSchlickRoughness(max(dot(N, V), F0), roughness);
+        // DFG
+        vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+        float D = DistributionGGX(N, H, roughness);
+        float G = GeometrySmith(N, V, L, roughness);
+
+        // Cook-Torrance Specular BRDF term
+        vec3 numerator = D * F * G;
+        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0);
+        vec3 specular = numerator / max(denominator, 0.001);
+
+        // Cook-Torrance Diffuse Term
+        vec3 kS = F; // kS is equal to F
+        // From LearnOpenGL: multiply kD by the inverse metalness such that only non-metals
+        // have diffuse lighting, or a linear blend if partly metal (pure metals
+        // have no diffuse light).
+        vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+
+        // Cook-Torrance Reflectance Equation
+        float NdotL = max(dot(N, L), 0.0);
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+    }
+
+    // IBL
+    vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+
+    vec3 kS = F;
     vec3 kD = 1.0 - kS;
     vec3 irradiance = texture(irradianceMap, N).rgb;
     vec3 diffuse = irradiance * albedo;
-    vec3 ambient = (kD * diffuse * ao);
 
-    
+    const float MAX_REFLECTION_LOD = 4.0;
+    vec3 prefilteredColor = textureLod(prefilterMap, R,  roughness * MAX_REFLECTION_LOD).rgb;
+    vec2 envBRDF  = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
+    vec3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
+
+    vec3 ambient = (kD * diffuse + specular) * ao;
+
+
     vec3 color = ambient + Lo;
 
     // HDR mapping

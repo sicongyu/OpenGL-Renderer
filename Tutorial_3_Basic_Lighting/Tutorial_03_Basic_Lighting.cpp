@@ -32,16 +32,73 @@ using namespace glm;
 
 GLFWwindow* window;
 
+Mesh* cube_mesh;
+
+GLuint equirectangularToCubeProgramID;
+
+unsigned int captureFBO, captureRBO;
+
+enum Model {M1911, Cerberus};
+
+static const glm::mat4 captureProjection = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
+static const glm::mat4 captureViews[] =
+{
+	glm::lookAt(glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+	glm::lookAt(glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+	glm::lookAt(glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+	glm::lookAt(glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
+	glm::lookAt(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+	glm::lookAt(glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f))
+};
+
+static const GLfloat g_vertex_buffer_data[] = {
+	-1.0f, -1.0f, -1.0f,
+	-1.0f, -1.0f, 1.0f,
+	-1.0f, 1.0f, 1.0f,
+	1.0f, 1.0f, -1.0f,
+	-1.0f, -1.0f, -1.0f,
+	-1.0f, 1.0f, -1.0f,
+	1.0f, -1.0f, 1.0f,
+	-1.0f, -1.0f, -1.0f,
+	1.0f, -1.0f, -1.0f,
+	1.0f, 1.0f, -1.0f,
+	1.0f, -1.0f, -1.0f,
+	-1.0f, -1.0f, -1.0f,
+	-1.0f, -1.0f, -1.0f,
+	-1.0f, 1.0f, 1.0f,
+	-1.0f, 1.0f, -1.0f,
+	1.0f, -1.0f, 1.0f,
+	-1.0f, -1.0f, 1.0f,
+	-1.0f, -1.0f, -1.0f,
+	-1.0f, 1.0f, 1.0f,
+	-1.0f, -1.0f, 1.0f,
+	1.0f, -1.0f, 1.0f,
+	1.0f, 1.0f, 1.0f,
+	1.0f, -1.0f, -1.0f,
+	1.0f, 1.0f, -1.0f,
+	1.0f, -1.0f, -1.0f,
+	1.0f, 1.0f, 1.0f,
+	1.0f, -1.0f, 1.0f,
+	1.0f, 1.0f, 1.0f,
+	1.0f, 1.0f, -1.0f,
+	-1.0f, 1.0f, -1.0f,
+	1.0f, 1.0f, 1.0f,
+	-1.0f, 1.0f, -1.0f,
+	-1.0f, 1.0f, 1.0f,
+	1.0f, 1.0f, 1.0f,
+	-1.0f, 1.0f, 1.0f,
+	1.0f, -1.0f, 1.0f
+};
+
 void error_callback(int error, const char* description)
 {
     puts(description);
 }
 
-
-void RenderCube(Mesh& cube_mesh) {
+void RenderCube() {
 
 	glEnableVertexAttribArray(0);
-	glBindBuffer(GL_ARRAY_BUFFER, cube_mesh.pos_id);
+	glBindBuffer(GL_ARRAY_BUFFER, cube_mesh->pos_id);
 	glVertexAttribPointer(
 		0,                  // attribute
 		3,                  // size
@@ -50,8 +107,89 @@ void RenderCube(Mesh& cube_mesh) {
 		0,                  // stride
 		(void*)0            // array buffer offset
 	);
-	glDrawArrays(GL_TRIANGLES, 0, cube_mesh.vertex_size);
+	glDrawArrays(GL_TRIANGLES, 0, cube_mesh->vertex_size);
 	glDisableVertexAttribArray(0);
+}
+
+unsigned int LoadImageAndConvertToCubemap(const char* path) {
+
+	GLuint E2CViewMatrixID = glGetUniformLocation(equirectangularToCubeProgramID, "V");
+	GLuint E2CProjectionMatrixID = glGetUniformLocation(equirectangularToCubeProgramID, "P");
+	GLuint E2CEnvMapID = glGetUniformLocation(equirectangularToCubeProgramID, "equirectangularMap");
+
+	// Load HDR Environment Mapping Image for IBL
+	stbi_set_flip_vertically_on_load(true);
+	int width, height, nrComponents;
+	float *data = stbi_loadf(path, &width, &height, &nrComponents, 0);
+	unsigned int hdrTexture;
+	if (data)
+	{
+		glGenTextures(1, &hdrTexture);
+		glBindTexture(GL_TEXTURE_2D, hdrTexture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		stbi_image_free(data);
+	}
+	else
+	{
+		printf("Failed to load HDR image.");
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, CUBEMAP_WIDTH, CUBEMAP_WIDTH);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+
+	unsigned int envCubemap;
+	glGenTextures(1, &envCubemap);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+	for (unsigned int i = 0; i < 6; i++) {
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, CUBEMAP_WIDTH, CUBEMAP_WIDTH, 0, GL_RGB, GL_FLOAT, nullptr);
+	}
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	// Projection equirectangular map to six faces of cube
+	//glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+
+	// convert HDR equirectangular environment map to cubemap equivalent
+	glUseProgram(equirectangularToCubeProgramID);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, hdrTexture);
+	glUniform1i(E2CEnvMapID, 0);
+
+	glUniformMatrix4fv(E2CProjectionMatrixID, 1, GL_FALSE, &captureProjection[0][0]);
+
+	glViewport(0, 0, CUBEMAP_WIDTH, CUBEMAP_WIDTH);
+	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	for (unsigned int i = 0; i < 6; i++) {
+		glUniformMatrix4fv(E2CViewMatrixID, 1, GL_FALSE, &captureViews[i][0][0]);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		RenderCube();
+		//RenderCube1();
+	}
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		printf("ERROR::FRAMEBUFFER:: Framebuffer is not complete!");
+
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// configure the viewport to the original framebuffer's screen dimensions
+	int scrWidth, scrHeight;
+	glfwGetFramebufferSize(window, &scrWidth, &scrHeight);
+	glViewport(0, 0, scrWidth, scrHeight);
+
+	return envCubemap;
 }
 
 int main(void)
@@ -127,16 +265,43 @@ int main(void)
 	GLuint MetallicTexID = glGetUniformLocation(programID, "metallicMap");
 	GLuint RoughnessTexID = glGetUniformLocation(programID, "roughnessMap");
 	GLuint AOTexID = glGetUniformLocation(programID, "AOMap");
+#if USE_IBL
+	GLuint IrradianceTexID = glGetUniformLocation(programID, "irradianceMap");
+	GLuint SpecularTexID = glGetUniformLocation(programID, "prefilterMap");
+	GLuint BRDFTexID = glGetUniformLocation(programID, "brdfLUT");
+#endif
 
 	//Mesh monkey("models/suzanne.obj");
 	//monkey.LoadTexture(Diffuse,"models/uvmap.DDS");
 
-	Mesh m1911("models/m1911/source/M1911.obj", true);
-	m1911.LoadTexture(Diffuse,"models/m1911/textures/M1911Dis_Material_AlbedoTransparency.png");
-	m1911.LoadTexture(Normal_Map, "models/m1911/textures/M1911Dis_Material_NormalOpenGL.png");
-	m1911.LoadTexture(Displace, "models/m1911/textures/M1911Dis_Material_AO.png");
-	m1911.LoadTexture(Roughness, "models/m1911/textures/M1911Dis_Material_Roughness.png");
-	m1911.LoadTexture(Metallic, "models/m1911/textures/M1911Dis_Material_MetallicSmoothness.png");
+
+	Mesh * cur_mesh;
+	Model cur_model = M1911;
+	switch (cur_model)
+	{
+	case M1911: {
+		Mesh m1911("models/m1911/source/M1911.obj", true);
+		m1911.LoadTexture(Diffuse, "models/m1911/textures/M1911Dis_Material_AlbedoTransparency.png");
+		m1911.LoadTexture(Normal_Map, "models/m1911/textures/M1911Dis_Material_NormalOpenGL.png");
+		m1911.LoadTexture(Displace, "models/m1911/textures/M1911Dis_Material_AO.png");
+		m1911.LoadTexture(Roughness, "models/m1911/textures/M1911Dis_Material_Roughness.png");
+		m1911.LoadTexture(Metallic, "models/m1911/textures/M1911Dis_Material_MetallicSmoothness.png");
+		cur_mesh = &m1911;
+		break;
+		}
+	case Cerberus: {
+		Mesh cerberus("models/Cerberus_by_Andrew_Maximov/Cerberus_LP.obj", true);
+		cerberus.LoadTexture(Diffuse, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_A.tga");
+		cerberus.LoadTexture(Normal_Map, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_N.tga");
+		cerberus.LoadTexture(Displace, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_N.tga");
+		cerberus.LoadTexture(Roughness, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_R.tga");
+		cerberus.LoadTexture(Metallic, "models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_M.tga");
+		cur_mesh = &cerberus;
+		break;
+		}
+	default:
+		break;
+	}
 
 	// Get a handle for our "LightPosition" uniform
 	glUseProgram(programID);
@@ -144,156 +309,101 @@ int main(void)
 	GLuint CameraID = glGetUniformLocation(programID, "CameraPos");
 
 #if PREVIEW_CUBE || USE_IBL
-	GLuint equirectangularToCubeProgramID = LoadShaders("shaders/Cube.vertexshader", "shaders/Cube.fragmentshader");
-	GLuint cubemapProgramID = LoadShaders("shaders/Cubemap.vertexshader", "shaders/Cubemap.fragmentshader");
 
-	GLuint E2CViewMatrixID = glGetUniformLocation(equirectangularToCubeProgramID, "V");
-	GLuint E2CProjectionMatrixID = glGetUniformLocation(equirectangularToCubeProgramID, "P");
-	GLuint E2CEnvMapID = glGetUniformLocation(equirectangularToCubeProgramID, "equirectangularMap");
+	// create vertex data for cube rendering
+	cube_mesh = new Mesh();
+	cube_mesh->setAtrribute(Pos, (void *)g_vertex_buffer_data, sizeof(g_vertex_buffer_data));
+	cube_mesh->vertex_size = sizeof(g_vertex_buffer_data) / sizeof(float) / 3;
+	cube_mesh->face_size = cube_mesh->vertex_size / 3;
+
+	equirectangularToCubeProgramID = LoadShaders("shaders/Cube.vertexshader", "shaders/Cube.fragmentshader");
+#endif
+
+#if USE_IBL
+
+	GLuint cubemapProgramID = LoadShaders("shaders/Cubemap.vertexshader", "shaders/Cubemap.fragmentshader");
 
 	GLuint CubemapViewMatrixID = glGetUniformLocation(cubemapProgramID, "V");
 	GLuint CubemapProjectionMatrixID = glGetUniformLocation(cubemapProgramID, "P");
 	GLuint CubemapEnvMapID = glGetUniformLocation(cubemapProgramID, "environmentMap");
 
-	// Load HDR Environment Mapping Image for IBL
-	stbi_set_flip_vertically_on_load(true);
-	int width, height, nrComponents;
-	//float *data = stbi_loadf("models/PaperMill_Ruins_E/PaperMill_E_8k.jpg", &width, &height, &nrComponents, 0);
-	float *data = stbi_loadf("models/Old_Industrial_Hall/fin4_Bg.jpg", &width, &height, &nrComponents, 0);
-	unsigned int hdrTexture;
-	if (data)
-	{
-		glGenTextures(1, &hdrTexture);
-		glBindTexture(GL_TEXTURE_2D, hdrTexture);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-		stbi_image_free(data);
-	}
-	else
-	{
-		printf("Failed to load HDR image.");
-		//std::cout << "Failed to load HDR image." << std::endl;
-	}
-
-
-	static const GLfloat g_vertex_buffer_data[] = {
-		-1.0f, -1.0f, -1.0f,
-		-1.0f, -1.0f, 1.0f,
-		-1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, -1.0f,
-		-1.0f, -1.0f, -1.0f,
-		-1.0f, 1.0f, -1.0f,
-		1.0f, -1.0f, 1.0f,
-		-1.0f, -1.0f, -1.0f,
-		1.0f, -1.0f, -1.0f,
-		1.0f, 1.0f, -1.0f,
-		1.0f, -1.0f, -1.0f,
-		-1.0f, -1.0f, -1.0f,
-		-1.0f, -1.0f, -1.0f,
-		-1.0f, 1.0f, 1.0f,
-		-1.0f, 1.0f, -1.0f,
-		1.0f, -1.0f, 1.0f,
-		-1.0f, -1.0f, 1.0f,
-		-1.0f, -1.0f, -1.0f,
-		-1.0f, 1.0f, 1.0f,
-		-1.0f, -1.0f, 1.0f,
-		1.0f, -1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, -1.0f, -1.0f,
-		1.0f, 1.0f, -1.0f,
-		1.0f, -1.0f, -1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, -1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, -1.0f,
-		-1.0f, 1.0f, -1.0f,
-		1.0f, 1.0f, 1.0f,
-		-1.0f, 1.0f, -1.0f,
-		-1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		-1.0f, 1.0f, 1.0f,
-		1.0f, -1.0f, 1.0f
-	};
-	Mesh cube_mesh;
-	cube_mesh.setAtrribute(Pos, (void *)g_vertex_buffer_data, sizeof(g_vertex_buffer_data));
-	cube_mesh.vertex_size = sizeof(g_vertex_buffer_data) / sizeof(float) / 3;
-	cube_mesh.face_size = cube_mesh.vertex_size / 3;
-#endif
-
-#if USE_IBL
-	unsigned int captureFBO, captureRBO;
 	glGenFramebuffers(1, &captureFBO);
 	glGenRenderbuffers(1, &captureRBO);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, CUBEMAP_WIDTH, CUBEMAP_WIDTH);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+	//unsigned int EnvCubemap = LoadImageAndConvertToCubemap("models/Old_Industrial_Hall/fin4_Bg.jpg");
+	unsigned int EnvCubemap = LoadImageAndConvertToCubemap("models/PaperMill_Ruins_E/PaperMill_E_8k.jpg");
 
-	unsigned int envCubemap;
-	glGenTextures(1, &envCubemap);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-	for (unsigned int i = 0; i < 6; i++) {
-		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, CUBEMAP_WIDTH, CUBEMAP_WIDTH, 0, GL_RGB, GL_FLOAT, nullptr);
+	//unsigned int IrradianceMap = LoadImageAndConvertToCubemap("models/Old_Industrial_Hall/fin4_Env.hdr");
+	unsigned int IrradianceMap = LoadImageAndConvertToCubemap("models/PaperMill_Ruins_E/PaperMill_E_Env.hdr");
+
+	unsigned int ReflectionMap = LoadImageAndConvertToCubemap("models/PaperMill_Ruins_E/PaperMill_E_3k.hdr");
+
+	GLuint integrateBRDF = loadTGA("models/pbr/convolution_spec.tga");
+
+
+	// Prefilter Specular Map
+	GLuint prefilterProgramID = LoadShaders("shaders/Cube.vertexshader", "shaders/Specular.fragmentshader");
+
+	GLuint PrefilterViewMatrixID = glGetUniformLocation(prefilterProgramID, "V");
+	GLuint PrefilterProjectionMatrixID = glGetUniformLocation(prefilterProgramID, "P");
+	GLuint PrefilterEnvMapID = glGetUniformLocation(prefilterProgramID, "environmentMap");
+	GLuint PrefilterRoughnessID = glGetUniformLocation(prefilterProgramID, "roughness");
+	
+	unsigned int prefilterMap;
+	glGenTextures(1, &prefilterMap);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, nullptr);
 	}
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	// Projection equirectangular map to six faces of cube
-	//glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
-	glm::mat4 captureProjection = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
-	glm::mat4 captureViews[] =
-	{
-		glm::lookAt(glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-		glm::lookAt(glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-		glm::lookAt(glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-		glm::lookAt(glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
-		glm::lookAt(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-		glm::lookAt(glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f))
-	};
+	glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
 
-	// convert HDR equirectangular environment map to cubemap equivalent
-	glUseProgram(equirectangularToCubeProgramID);
+	glUseProgram(prefilterProgramID);
+	glUniformMatrix4fv(PrefilterProjectionMatrixID, 1, GL_FALSE, &captureProjection[0][0]);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, hdrTexture);
-	glUniform1i(E2CEnvMapID, 0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, ReflectionMap);
+	glUniform1i(PrefilterEnvMapID, 0);
 
-	glUniformMatrix4fv(E2CProjectionMatrixID, 1, GL_FALSE, &captureProjection[0][0]);
 
-	glViewport(0, 0, CUBEMAP_WIDTH, CUBEMAP_WIDTH);
-	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	for (unsigned int i = 0; i < 6; i++) {
-		glUniformMatrix4fv(E2CViewMatrixID, 1, GL_FALSE, &captureViews[i][0][0]);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		RenderCube(cube_mesh);
-		//RenderCube1();
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+	unsigned int maxMipLevels = 5;
+	for (unsigned int mip = 0; mip < maxMipLevels; ++mip)
+	{
+		// reisze framebuffer according to mip-level size.
+		unsigned int mipWidth = 128 * std::pow(0.5, mip);
+		unsigned int mipHeight = 128 * std::pow(0.5, mip);
+		glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
+		glViewport(0, 0, mipWidth, mipHeight);
+
+		float roughness = (float)mip / (float)(maxMipLevels - 1);
+		glUniform1f(PrefilterRoughnessID, roughness);
+		for (unsigned int i = 0; i < 6; ++i)
+		{
+			glUniformMatrix4fv(PrefilterViewMatrixID, 1, GL_FALSE, &captureViews[i][0][0]);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+				GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterMap, mip);
+
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			RenderCube();
+		}
 	}
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		printf("ERROR::FRAMEBUFFER:: Framebuffer is not complete!");
 
-	//glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	// configure the viewport to the original framebuffer's screen dimensions
 	int scrWidth, scrHeight;
 	glfwGetFramebufferSize(window, &scrWidth, &scrHeight);
 	glViewport(0, 0, scrWidth, scrHeight);
 
-	// Initialize Cubemap Shader
-	//glUseProgram(cubemapProgramID);
-	//glUseProgram(cubemapProgramID);
-	//glm::mat4 CubemapProjectionMatrix = getProjectionMatrix();
-	//glUniformMatrix4fv(CubemapProjectionMatrixID, 1, GL_FALSE, &CubemapProjectionMatrix[0][0]);
+
 #endif
 	
 	float angle = 0.0;
@@ -321,7 +431,6 @@ int main(void)
 		lastTime = curTime;
 	};
 
-	Mesh * cur_mesh = &m1911;
 	do{
 		//f(cur_mesh);
 		// Clear the screen
@@ -374,6 +483,23 @@ int main(void)
 		glActiveTexture(GL_TEXTURE4);
 		glBindTexture(GL_TEXTURE_2D, cur_mesh->metallic_texture_id);
 		glUniform1i(MetallicTexID, 4);
+
+#if USE_IBL
+
+		glActiveTexture(GL_TEXTURE5);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, IrradianceMap);
+		glUniform1i(IrradianceTexID, 5);
+
+		glActiveTexture(GL_TEXTURE6);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+		glUniform1i(SpecularTexID, 6);
+
+		glActiveTexture(GL_TEXTURE7);
+		glBindTexture(GL_TEXTURE_2D, integrateBRDF);
+		glUniform1i(BRDFTexID, 7);
+
+#endif // USE_IBL
+
 
 		// 1rst attribute buffer : vertices
 		glEnableVertexAttribArray(0);
@@ -465,10 +591,11 @@ int main(void)
 		glUseProgram(cubemapProgramID);
 		glUniformMatrix4fv(CubemapProjectionMatrixID, 1, GL_FALSE, &ProjectionMatrix[0][0]);
 		glUniformMatrix4fv(CubemapViewMatrixID, 1, GL_FALSE, &ViewMatrix[0][0]);
-		glActiveTexture(GL_TEXTURE6);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-		glUniform1i(CubemapEnvMapID, 6);
-		RenderCube(cube_mesh);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, EnvCubemap);
+		//glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+		glUniform1i(CubemapEnvMapID, 0);
+		RenderCube();
 #endif
 
 		//printText2D("Arrow Key move camera ,LSHIFT Speed", 10, 10, 20);
