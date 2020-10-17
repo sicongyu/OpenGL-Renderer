@@ -98,14 +98,14 @@ static const GLfloat g_vertex_buffer_data[] = {
 };
 
 static const GLfloat quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
-	// positions  // texCoords
-	-1.0f,  1.0f, 0.0f, 1.0f,
-	-1.0f, -1.0f, 0.0f, 0.0f,
-	1.0f, -1.0f,  1.0f, 0.0f,
-				  
-	-1.0f,  1.0f, 0.0f, 1.0f,
-	1.0f, -1.0f,  1.0f, 0.0f,
-	1.0f,  1.0f,  1.0f, 1.0f
+	// positions		 // texCoords
+	-1.0f,  1.0f,  0.0f, //0.0f, 1.0f,
+	-1.0f, -1.0f,  0.0f, //0.0f, 0.0f,
+	1.0f,  -1.0f,  0.0f, //1.0f, 0.0f,
+				  		 //
+	-1.0f,  1.0f,  0.0f, //0.0f, 1.0f,
+	1.0f,  -1.0f,  0.0f, //1.0f, 0.0f,
+	1.0f,   1.0f,  0.0f  //1.0f, 1.0f
 };
 
 static const GLfloat quadTexs[] = {
@@ -128,29 +128,29 @@ void RenderQuad() {
 	//glBindTexture(GL_TEXTURE_2D, textureColorbuffer);	// use the color attachment texture as the texture of the quad plane
 	//glDrawArrays(GL_TRIANGLES, 0, 6);
 	//printf("Start rendering quad.");
-	//glEnableVertexAttribArray(0);
-	//glBindBuffer(GL_ARRAY_BUFFER, quad_mesh->pos_id);
-	//glVertexAttribPointer(
-	//	0,                  // attribute
-	//	2,                  // size
-	//	GL_FLOAT,           // type
-	//	GL_FALSE,           // normalized?
-	//	0,                  // stride
-	//	(void*)0            // array buffer offset
-	//);
-	//glEnableVertexAttribArray(1);
-	//glBindBuffer(GL_ARRAY_BUFFER, quad_mesh->uv_id);
-	//glVertexAttribPointer(
-	//	0,                  // attribute
-	//	2,                  // size
-	//	GL_FLOAT,           // type
-	//	GL_FALSE,           // normalized?
-	//	0,                  // stride
-	//	(void*)0            // array buffer offset
-	//);
-	//glDrawArrays(GL_TRIANGLES, 0, quad_mesh->vertex_size);
-	//glDisableVertexAttribArray(0);
-	//glDisableVertexAttribArray(1);
+	glEnableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, quad_mesh->pos_id);
+	glVertexAttribPointer(
+		0,                  // attribute
+		3,                  // size
+		GL_FLOAT,           // type
+		GL_FALSE,           // normalized?
+		3 * sizeof(float),                  // stride
+		(void*)0            // array buffer offset
+	);
+	glEnableVertexAttribArray(1);
+	glBindBuffer(GL_ARRAY_BUFFER, quad_mesh->uv_id);
+	glVertexAttribPointer(
+		1,                  // attribute
+		2,                  // size
+		GL_FLOAT,           // type
+		GL_FALSE,           // normalized?
+		2 * sizeof(float),                  // stride
+		(void*)0            // array buffer offset
+	);
+	glDrawArrays(GL_TRIANGLES, 0, quad_mesh->vertex_size);
+	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(1);
 }
 
 void RenderCube() {
@@ -472,41 +472,53 @@ int main(void)
 #if USE_BLOOM
 
 	// create VAO for quad rendering
-	//quad_mesh = new Mesh();
-	//quad_mesh->setAtrribute(Pos, (void *)quadVertices, sizeof(quadVertices));
-	//quad_mesh->setAtrribute(Uv, (void *)quadTexs, sizeof(quadTexs));
-	//quad_mesh->vertex_size = sizeof(quadVertices) / sizeof(float) / 2;
-	//quad_mesh->face_size = 2;
+	quad_mesh = new Mesh();
+	quad_mesh->setAtrribute(Pos, (void *)quadVertices, sizeof(quadVertices));
+	quad_mesh->setAtrribute(Uv, (void *)quadTexs, sizeof(quadTexs));
+	quad_mesh->vertex_size = sizeof(quadVertices) / sizeof(float) / 3;
+	quad_mesh->face_size = 2;
+	printf("Quad VAO data generated.\n");
 
 	GLuint screenProgramID = LoadShaders("shaders/screen.vertexshader", "shaders/screen.fragmentshader");
 	GLuint screenTexID = glGetUniformLocation(screenProgramID, "screenTexture");
 
+	printf("Bloom shader started.\n");
+
 	//unsigned int quadVAO, quadVBO;
-	glGenVertexArrays(1, &quadVAO);
-	glGenBuffers(1, &quadVBO);
-	glBindVertexArray(quadVAO); 
-	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+	//glGenVertexArrays(1, &quadVAO);
+	//glGenBuffers(1, &quadVBO);
+	//glBindVertexArray(quadVAO); 
+	//glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+	//glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+	//glEnableVertexAttribArray(0);
+	//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	//glEnableVertexAttribArray(1);
+	//glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	//glBindBuffer(GL_ARRAY_BUFFER, 0);
+	//glBindVertexArray(0);
+	//printf("Quad VAO data generated.\n");
 
 	GLuint hdrFBO;
-	glGenFramebuffers(GL_FRAMEBUFFER, &hdrFBO);
+	glGenFramebuffers(1, &hdrFBO);
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
 
+	printf("Frame buffer generated.\n");
+
 	GLuint colorBuffer;
+	glGenTextures(1, &colorBuffer);
 	glBindTexture(GL_TEXTURE_2D, colorBuffer);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glFramebufferTexture2D(
 		GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBuffer, 0
 	);
+
+	printf("Colorbuffer generated.\n");
 
 	unsigned int rbo;
 	glGenRenderbuffers(1, &rbo);
@@ -516,6 +528,8 @@ int main(void)
 	// now that we actually created the framebuffer and added all attachments we want to check if it is actually complete now
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		printf("ERROR::FRAMEBUFFER:: Framebuffer is not complete!");
+
+	printf("Render buffer generated. Frame buffer complete.\n");
 
 	//GLuint colorBuffers[2];
 	//glGenTextures(2, colorBuffers);
@@ -564,8 +578,8 @@ int main(void)
 		//f(cur_mesh);
 #if USE_BLOOM
 		glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
-		GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-		glDrawBuffers(2, attachments);
+		//GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+		//glDrawBuffers(2, attachments);
 		glEnable(GL_DEPTH_TEST);
 #endif
 		//glDrawElements(GL_TRIANGLES, cur_mesh->face_size * 3, GL_UNSIGNED_SHORT, (void *)0);
@@ -700,22 +714,8 @@ int main(void)
 
 		//glDrawArrays(GL_TRIANGLES, 0, cur_mesh->vertex_size);
 
-		printf("Outputing PBR shading.");
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cur_mesh->index_id);
 		glDrawElements(GL_TRIANGLES, cur_mesh->face_size * 3, GL_UNSIGNED_SHORT, (void *)0);
-
-#if USE_BLOOM
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glUseProgram(screenProgramID);
-		glBindVertexArray(quadVAO);
-		//glActiveTexture(GL_TEXTURE0);
-		//glBindTexture(GL_TEXTURE_2D, colorBuffers[0]);
-		glBindTexture(GL_TEXTURE_2D, colorBuffer);
-		glUniform1i(screenTexID, 0);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-
-#endif
 
 		glDisableVertexAttribArray(0);
 		glDisableVertexAttribArray(1);
@@ -749,6 +749,22 @@ int main(void)
 		RenderCube();
 #endif
 
+#if USE_BLOOM
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_STENCIL_TEST);
+		glUseProgram(screenProgramID);
+		//glBindVertexArray(quadVAO);
+		glActiveTexture(GL_TEXTURE0);
+		//glBindTexture(GL_TEXTURE_2D, colorBuffers[0]);
+		glBindTexture(GL_TEXTURE_2D, colorBuffer);
+		glUniform1i(screenTexID, 0);
+		RenderQuad();
+		//glDrawArrays(GL_TRIANGLES, 0, 6);
+
+#endif
+
 		//printText2D("Arrow Key move camera ,LSHIFT Speed", 10, 10, 20);
 		//printText2D("0 NinjaHead", 10, 50, 20);
 		//printText2D("1 Cube", 10, 80, 20);
@@ -769,6 +785,7 @@ int main(void)
 	glDeleteProgram(equirectangularToCubeProgramID);
 	glDeleteProgram(cubemapProgramID);
 	glDeleteProgram(prefilterProgramID);
+	glDeleteProgram(screenProgramID);
 
 	delete cur_mesh;
 	delete cube_mesh;
