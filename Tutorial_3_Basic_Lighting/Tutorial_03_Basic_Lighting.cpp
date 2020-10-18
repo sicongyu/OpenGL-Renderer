@@ -394,7 +394,8 @@ int main(void)
 	glGenRenderbuffers(1, &captureRBO);
 
 	//unsigned int EnvCubemap = LoadImageAndConvertToCubemap("models/Old_Industrial_Hall/fin4_Bg.jpg");
-	unsigned int EnvCubemap = LoadImageAndConvertToCubemap("models/PaperMill_Ruins_E/PaperMill_E_8k.jpg");
+	//unsigned int EnvCubemap = LoadImageAndConvertToCubemap("models/PaperMill_Ruins_E/PaperMill_E_8k.jpg");
+	unsigned int EnvCubemap = LoadImageAndConvertToCubemap("models/PaperMill_Ruins_E/PaperMill_E_3k.hdr");
 
 	//unsigned int IrradianceMap = LoadImageAndConvertToCubemap("models/Old_Industrial_Hall/fin4_Env.hdr");
 	unsigned int IrradianceMap = LoadImageAndConvertToCubemap("models/PaperMill_Ruins_E/PaperMill_E_Env.hdr");
@@ -479,30 +480,15 @@ int main(void)
 	quad_mesh->face_size = 2;
 	printf("Quad VAO data generated.\n");
 
-	GLuint screenProgramID = LoadShaders("shaders/screen.vertexshader", "shaders/screen.fragmentshader");
+	GLuint screenProgramID = LoadShaders("shaders/screen.vertexshader", "shaders/Highlight.fragmentshader");
 	GLuint screenTexID = glGetUniformLocation(screenProgramID, "screenTexture");
 
 	printf("Bloom shader started.\n");
 
+	// Generate Framebuffer for HDR extraction
 	GLuint hdrFBO;
 	glGenFramebuffers(1, &hdrFBO);
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
-
-	printf("Frame buffer generated.\n");
-
-	//GLuint colorBuffer;
-	//glGenTextures(1, &colorBuffer);
-	//glBindTexture(GL_TEXTURE_2D, colorBuffer);
-	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	//glBindTexture(GL_TEXTURE_2D, 0);
-
-	//glFramebufferTexture2D(
-	//	GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBuffer, 0
-	//);
 
 	printf("Colorbuffer generated.\n");
 
@@ -517,6 +503,7 @@ int main(void)
 
 	printf("Render buffer generated. Frame buffer complete.\n");
 
+	// Generate Textures for output and HDR extraction
 	GLuint colorBuffers[2];
 	glGenTextures(2, colorBuffers);
 	for (GLuint i = 0; i < 2; i++) {
@@ -534,6 +521,34 @@ int main(void)
 	GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 	glDrawBuffers(2, attachments);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// Generate Ping-pong Framebuffers for Guassian Blur
+	GLuint pingpongFBOs[2];
+	GLuint pingpongBuffers[2];
+	glGenFramebuffers(2, pingpongFBOs);
+	glGenTextures(2, pingpongBuffers);
+	for (GLuint i = 0; i < 2; i++) {
+		glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBOs[i]);
+		glBindTexture(GL_TEXTURE_2D, pingpongBuffers[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongBuffers[i], 0);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// Generate Shader for Gaussian Blur
+	GLuint gaussianProgramID = LoadShaders("shaders/screen.vertexshader", "shaders/Gaussian.fragmentshader");
+	
+	GLuint gaussianTexID = glGetUniformLocation(gaussianProgramID, "image");
+	GLuint gaussianHorizontalID = glGetUniformLocation(gaussianProgramID, "horizontal");
+
+	GLuint bloomProgramID = LoadShaders("shaders/screen.vertexshader", "shaders/BloomBlender.fragmentshader");
+	GLuint bloomSceneTexID = glGetUniformLocation(bloomProgramID, "scene");
+	GLuint bloomBlurTexID = glGetUniformLocation(bloomProgramID, "bloomBlur");
+
 #endif
 	
 	float angle = 0.0;
@@ -736,18 +751,51 @@ int main(void)
 #endif
 
 #if USE_BLOOM
+
+		//glUseProgram(screenProgramID);
+		//glActiveTexture(GL_TEXTURE0);
+		//glBindTexture(GL_TEXTURE_2D, colorBuffers[0]);
+		//glUniform1i(screenTexID, 0);
+		//RenderQuad();
+
+		GLboolean horizontal = true, first_iteration = true;
+		GLuint amount = 10;
+		glUseProgram(gaussianProgramID);
+		glActiveTexture(GL_TEXTURE0);
+		glUniform1i(gaussianTexID, 0);
+		for (int i = 0; i < amount; i++) {
+			glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBOs[horizontal]);
+			glUniform1i(gaussianHorizontalID, horizontal);
+			glBindTexture(GL_TEXTURE_2D, first_iteration ? colorBuffers[1] : pingpongBuffers[!horizontal]);
+			RenderQuad();
+			horizontal = !horizontal;
+			if (first_iteration) {
+				first_iteration = false;
+			}
+		}
+
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glDisable(GL_DEPTH_TEST);
 		glDisable(GL_STENCIL_TEST);
-		glUseProgram(screenProgramID);
-		//glBindVertexArray(quadVAO);
+		glUseProgram(bloomProgramID);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, colorBuffers[1]);
-		//glBindTexture(GL_TEXTURE_2D, colorBuffer);
-		glUniform1i(screenTexID, 0);
+		glBindTexture(GL_TEXTURE_2D, colorBuffers[0]);
+		glUniform1i(bloomSceneTexID, 0);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, pingpongBuffers[!horizontal]);
+		glUniform1i(bloomBlurTexID, 1);
 		RenderQuad();
-		//glDrawArrays(GL_TRIANGLES, 0, 6);
+
+		//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		//glClear(GL_COLOR_BUFFER_BIT);
+		//glDisable(GL_DEPTH_TEST);
+		//glDisable(GL_STENCIL_TEST); 
+		//glUseProgram(screenProgramID);
+		//glActiveTexture(GL_TEXTURE0);
+		//glBindTexture(GL_TEXTURE_2D, colorBuffers[1]);
+		//glUniform1i(screenTexID, 0);
+		//RenderQuad();
 
 #endif
 
