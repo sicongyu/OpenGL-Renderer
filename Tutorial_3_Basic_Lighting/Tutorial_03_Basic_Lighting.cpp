@@ -31,7 +31,7 @@ using namespace glm;
 
 #define CUBEMAP_WIDTH 1024
 
-#define SCR_WIDTH 1024
+#define SCR_WIDTH 1024	
 #define SCR_HEIGHT 768
 
 GLFWwindow* window;
@@ -266,7 +266,7 @@ int main(void)
 	glfwWindowHint(GLFW_SAMPLES, 4); // Hint MSAA
 
 	// Open a window and create its OpenGL context
-	window = glfwCreateWindow( 1024, 768, "Tutorial 03", NULL, NULL);
+	window = glfwCreateWindow( SCR_WIDTH, SCR_HEIGHT, "Tutorial 03", NULL, NULL);
 	if (window==NULL)
 	{
 		fprintf(stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 version of the tutorials.\n");
@@ -286,7 +286,7 @@ int main(void)
 
 	// Ensure we can capture the escape key being pressed below
 	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
-	glfwSetCursorPos(window, 1024 / 2, 768 / 2);
+	glfwSetCursorPos(window, SCR_WIDTH / 2, SCR_HEIGHT / 2);
 
 	// Dark blue background
 	glClearColor(0.227f, 0.227f, 0.227f, 0.0f);
@@ -759,7 +759,7 @@ int main(void)
 		//RenderQuad();
 
 		GLboolean horizontal = true, first_iteration = true;
-		GLuint amount = 10;
+		GLuint amount = 2;
 		glUseProgram(gaussianProgramID);
 		glActiveTexture(GL_TEXTURE0);
 		glUniform1i(gaussianTexID, 0);
